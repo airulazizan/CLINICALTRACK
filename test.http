@@ -1,0 +1,16 @@
+POST https://compostwithus.my/clinicaltrack_api/assessment_api.php
+Content-Type: application/json
+
+{
+  "id": "test-123",
+  "studentId": "S001",
+  "checklistId": "CL001",
+  "checklistTitle": "Blood Pressure",
+  "studentName": "Ali",
+  "assessorName": "Dr Airul",
+  "completedStepIndices": [0,1,2],
+  "stepScores": [2,2,1],
+  "totalSteps": 3,
+  "score": 83,
+  "timestamp": "2024-12-06T04:21:33.123Z"
+}

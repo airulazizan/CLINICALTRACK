@@ -145,56 +145,82 @@ const Assessment: React.FC<AssessmentProps> = ({ students, checklists, assessors
     setVerificationPin('');
   };
 
-  const confirmVerification = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedAssessor || !selectedChecklist) return;
+  
+const confirmVerification = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!selectedAssessor || !selectedChecklist) return;
 
-    if (verificationPin !== selectedAssessor.verificationCode) {
-        setVerificationError("Incorrect PIN. Please try again.");
-        return;
-    }
+  if (verificationPin !== selectedAssessor.verificationCode) {
+    setVerificationError("Incorrect PIN. Please try again.");
+    return;
+  }
 
-    // Success Calculation
-    const totalSteps = selectedChecklist.steps.length;
-    const maxPossibleScore = totalSteps * 2; // 2 points per step
-    
-    // Calculate sum of scores
-    // Casting to number[] to avoid 'unknown' type error in reduce
-    const earnedScore = (Object.values(stepScores) as number[]).reduce((acc, curr) => acc + curr, 0);
-    
-    // Calculate percentage
-    const finalPercentage = maxPossibleScore > 0 
-        ? Math.round((earnedScore / maxPossibleScore) * 100) 
-        : 0;
+  // Success Calculation
+  const totalSteps = selectedChecklist.steps.length;
+  const maxPossibleScore = totalSteps * 2; // 2 points per step
 
-    // Determine "Fully Completed" steps (where score is 2) for legacy compatibility/reporting
-    const completedIndices = Object.entries(stepScores)
-        .filter(([_, score]) => score === 2)
-        .map(([index, _]) => parseInt(index));
-    
-    // Create Step Scores Array (fill 0 if undefined)
-    const scoresArray = Array.from({ length: totalSteps }, (_, i) => stepScores[i] || 0);
+  // Calculate sum of scores
+  // Casting to number[] to avoid 'unknown' type error in reduce
+  const earnedScore = (Object.values(stepScores) as number[]).reduce(
+    (acc, curr) => acc + curr,
+    0
+  );
 
-    const assessment: AssessmentType = {
-      id: crypto.randomUUID(),
-      studentId: selectedStudent!.id,
-      checklistId: selectedChecklist!.id,
-      checklistTitle: selectedChecklist!.title,
-      studentName: selectedStudent!.name,
-      assessorName: selectedAssessor.name,
-      completedStepIndices: completedIndices,
-      stepScores: scoresArray,
-      totalSteps: totalSteps,
-      score: finalPercentage,
-      timestamp: new Date().toISOString(),
-    };
+  const finalPercentage =
+    maxPossibleScore > 0
+      ? Math.round((earnedScore / maxPossibleScore) * 100)
+      : 0;
 
-    addAssessment(assessment);
-    
-    // Explicitly clear active state before navigating so guard doesn't trigger
-    setIsAssessmentActive(false);
-    setView('results');
+  // Determine completed steps: index yang score = 2
+  const completedIndices = Object.entries(stepScores)
+    .filter(([_, score]) => score === 2)
+    .map(([index, _]) => parseInt(index));
+
+  // Create Step Scores Array (fill 0 if undefined)
+  const scoresArray = Array.from(
+    { length: totalSteps },
+    (_, i) => stepScores[i] || 0
+  );
+
+  const assessment: AssessmentType = {
+    id: crypto.randomUUID(),
+    studentId: selectedStudent!.id,
+    checklistId: selectedChecklist!.id,
+    checklistTitle: selectedChecklist!.title,
+    studentName: selectedStudent!.name,
+    assessorName: selectedAssessor.name,
+    completedStepIndices: completedIndices,
+    stepScores: scoresArray,
+    totalSteps: totalSteps,
+    score: finalPercentage,
+    timestamp: new Date().toISOString(),
   };
+
+  // 1) Simpan dalam state React dulu (supaya UI jalan walaupun API gagal)
+  addAssessment(assessment);
+
+  // 2) Hantar ke backend PHP (cPanel)
+  try {
+    await fetch(
+      'https://compostwithus.my/clinicaltrack_api/assessment_api.php',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(assessment),
+      }
+    );
+  } catch (error) {
+    console.error('Failed to save assessment to DB', error);
+    // Kalau nak, boleh guna setVerificationError("Failed to save to server");
+  }
+
+  // Explicitly clear active state before navigating so guard doesn't trigger
+  setIsAssessmentActive(false);
+  setView('results');
+};
+
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
